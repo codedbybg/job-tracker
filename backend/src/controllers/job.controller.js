@@ -76,26 +76,182 @@ const createJob = async (req , res)=>{
 };
 
 // GET ALL JOBS
-const getJobs = async (req , res)=>{
+// GET JOBS WITH SEARCH, FILTERING & PAGINATION
+const getJobs = async (req, res) => {
     try {
-        const jobs = await Job.find({
-            status : "open"
-        }).populate("recruiter" , "name email").sort({createdAt : -1});
+        const {
+            keyword,
+            location,
+            jobType,
+            minSalary,
+            maxSalary,
+            skills,
+            sort = "newest",
+            page = 1,
+            limit = 10
+        } = req.query;
+
+    if (minSalary && isNaN(Number(minSalary))) {
+        return res.status(400).json({
+            success: false,
+            message: "minSalary must be a valid number"
+        });
+    }
+
+    if (maxSalary && isNaN(Number(maxSalary))) {
+        return res.status(400).json({
+            success: false,
+            message: "maxSalary must be a valid number"
+        });
+    }
+
+        // -----------------------------
+        // BUILD FILTER
+        // -----------------------------
+
+        const filter = {
+            status: "open"
+        };
+
+        // Keyword search
+        if (keyword) {
+            filter.$or = [
+                {
+                    title: {
+                        $regex: keyword,
+                        $options: "i"
+                    }
+                },
+                {
+                    company: {
+                        $regex: keyword,
+                        $options: "i"
+                    }
+                },
+                {
+                    description: {
+                        $regex: keyword,
+                        $options: "i"
+                    }
+                }
+            ];
+        }
+
+        // Location filter
+        if (location) {
+            filter.location = {
+                $regex: location,
+                $options: "i"
+            };
+        }
+
+        // Job type filter
+        if (jobType) {
+            filter.jobType = jobType;
+        }
+
+        // Salary range filter
+        if (minSalary || maxSalary) {
+            filter.salaryMin = {};
+            filter.salaryMax = {};
+
+            if (minSalary) {
+                filter.salaryMax.$gte = Number(minSalary);
+            }
+
+            if (maxSalary) {
+                filter.salaryMin.$lte = Number(maxSalary);
+            }
+        }
+
+        // Skills filter
+        if (skills) {
+            const skillArray = skills
+                .split(",")
+                .map(skill => skill.trim());
+
+            filter.skills = {
+                $in: skillArray
+            };
+        }
+
+        // -----------------------------
+        // PAGINATION
+        // -----------------------------
+
+        const currentPage = Math.max(Number(page), 1);
+        const itemsPerPage = Math.min(
+            Math.max(Number(limit), 1),
+            50
+        );
+
+        const skip =
+            (currentPage - 1) * itemsPerPage;
+
+
+        let sortOption = {
+            createdAt: -1
+        };
+
+        if (sort === "oldest") {
+            sortOption = {
+                createdAt: 1
+            };
+        }
+
+        if (sort === "salary-high") {
+            sortOption = {
+                salaryMax: -1
+            };
+        }
+
+        if (sort === "salary-low") {
+            sortOption = {
+                salaryMin: 1
+            };
+        }
+
+        // -----------------------------
+        // QUERY DATABASE
+        // -----------------------------
+
+        const jobs = await Job.find(filter)
+            .populate("recruiter", "name email")
+            .sort(sortOption)
+            .skip(skip)
+            .limit(itemsPerPage);
+
+        // Count matching jobs
+        const totalJobs = await Job.countDocuments(filter);
+
+        const totalPages = Math.ceil(
+            totalJobs / itemsPerPage
+        );
+
+        // -----------------------------
+        // RESPONSE
+        // -----------------------------
 
         res.status(200).json({
-            success : true,
-            count : jobs.length,
-            data : jobs
-        });
+            success: true,
 
+            pagination: {
+                currentPage,
+                itemsPerPage,
+                totalJobs,
+                totalPages
+            },
+
+            data: jobs
+        });
 
     } catch (error) {
         console.error(error);
 
         res.status(500).json({
-            success : false,
-            message : "Failed to fetch jobs",
-            error : error.message
+            success: false,
+            message: "Failed to fetch jobs",
+            error: error.message
         });
     }
 };
