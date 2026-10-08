@@ -171,8 +171,37 @@ const getMe = async (req, res) => {
     }
 };
 
+const getCandidateDashboard = async (req, res) => {
+    res.status(200).json({
+        success: true,
+        message: "Welcome to candidate dashboard",
+        user: req.user
+    });
+};
+
+
+const getRecruiterDashboard = async (req, res) => {
+    res.status(200).json({
+        success: true,
+        message: "Welcome to recruiter dashboard",
+        user: req.user
+    });
+};
+
+
+const getAdminDashboard = async (req, res) => {
+    res.status(200).json({
+        success: true,
+        message: "Welcome to admin dashboard",
+        user: req.user
+    });
+};
+
 module.exports = {
     register , 
     login,
-    getMe
+    getMe,
+    getCandidateDashboard,
+    getRecruiterDashboard,
+    getAdminDashboard
 };
