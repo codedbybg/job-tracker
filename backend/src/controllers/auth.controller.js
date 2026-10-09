@@ -8,6 +8,42 @@ const register = async (req , res)=>{
     try{
         const {name , email , password , phone , location} = req.body;
 
+        if (
+            typeof name !== "string" ||
+            typeof email !== "string" ||
+            typeof password !== "string"
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "Name, email and password must be strings"
+            });
+        }
+
+        if (name.trim().length < 2 || name.trim().length > 50) {
+            return res.status(400).json({
+                success: false,
+                message: "Name must be between 2 and 50 characters"
+            });
+        }
+
+        const normalizedEmail = email.trim().toLowerCase();
+
+        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+        if (!emailPattern.test(normalizedEmail)) {
+            return res.status(400).json({
+                success: false,
+                message: "Please provide a valid email address"
+            });
+        }
+
+        if (password.length < 8 || password.length > 72) {
+            return res.status(400).json({
+                success: false,
+                message: "Password must be between 8 and 72 characters"
+            });
+        }
+
         // 1. Validate required fields
         if(!name || !email || !password ){
             return res.status(400).json({
@@ -18,7 +54,7 @@ const register = async (req , res)=>{
 
         // 2. Check if user already exists
         const existingUser = await User.findOne({
-            email : email.toLowerCase()
+            email: normalizedEmail
         });
 
         if(existingUser){
@@ -33,12 +69,12 @@ const register = async (req , res)=>{
 
         // 4. Create User
         const user = await User.create({
-            name,
-            email : email.toLowerCase(),
-            password : hashedPassword,
+            name: name.trim(),
+            email: normalizedEmail,
+            password: hashedPassword,
             phone,
             location,
-            role : "candidate"
+            role: "candidate"
         });
 
         // 5. Return safe response

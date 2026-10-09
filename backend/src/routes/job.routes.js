@@ -3,13 +3,14 @@ const {createJob , getJobs , getJobById , updateJob , deleteJob} = require("../c
 
 const protect = require("../middleware/auth.middleware");
 const authorizeRoles = require("../middleware/role.middleware");
+const validateObjectId = require("../middleware/validateObjectId");
 
 const router = express.Router();
 
 // public
 router.get("/" , getJobs);
 
-router.get("/:id" , getJobById);
+router.get("/:id" , validateObjectId("id"), getJobById);
 
 // RECRUITER + ADMIN
 router.post(
@@ -24,6 +25,7 @@ router.put(
     "/:id",
     protect,
     authorizeRoles("recruiter" , "admin"),
+    validateObjectId("id"),
     updateJob
 );
 
@@ -32,6 +34,7 @@ router.delete(
     "/:id",
     protect,
     authorizeRoles("recruiter" , "admin"),
+    validateObjectId("id"),
     deleteJob
 );
 

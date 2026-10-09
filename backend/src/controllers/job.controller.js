@@ -313,14 +313,56 @@ const updateJob = async (req, res) => {
             });
         }
 
+        
+        const allowedFields = [
+            "title",
+            "company",
+            "description",
+            "location",
+            "jobType",
+            "salaryMin",
+            "salaryMax",
+            "experienceMin",
+            "skills",
+            "deadline",
+            "status"
+        ];
+
+        const updates = {};
+
+        for (const field of allowedFields) {
+            if (req.body[field] !== undefined) {
+                updates[field] = req.body[field];
+            }
+        }
+
+        if (Object.keys(updates).length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "No valid fields provided for update"
+            });
+        }
+
+        if (
+            updates.salaryMin !== undefined &&
+            updates.salaryMax !== undefined &&
+            updates.salaryMin > updates.salaryMax
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "Minimum salary cannot exceed maximum salary"
+            });
+        }
+
         const updatedJob = await Job.findByIdAndUpdate(
             id,
-            req.body,
+            { $set: updates },
             {
                 new: true,
                 runValidators: true
             }
         );
+
 
         res.status(200).json({
             success: true,

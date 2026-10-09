@@ -1,28 +1,39 @@
 const express = require("express");
 
-// import user controller
-const {createUser , getUser , baseRoute , getUserById , updateUser , deleteUser} = require("../controllers/user.controller")
+const {
+    getUsers,
+    getUserById,
+    updateUser,
+    deleteUser
+} = require("../controllers/user.controller");
 
-// created router
+const protect = require("../middleware/auth.middleware");
+const authorizeRoles = require("../middleware/role.middleware");
+const validateObjectId = require("../middleware/validateObjectId");
+
 const router = express.Router();
 
+// All routes below require an administrator
+router.use(protect, authorizeRoles("admin"));
 
-// router.get("/" , baseRoute);
+router.get("/", getUsers);
 
-// CREATE
-router.post("/" , createUser);
+router.get(
+    "/:id",
+    validateObjectId("id"),
+    getUserById
+);
 
-// READ ALL
-router.get("/", getUser);
+router.put(
+    "/:id",
+    validateObjectId("id"),
+    updateUser
+);
 
-// READ ONE
-router.get("/:id" , getUserById);
-
-// UPDATE
-router.put("/:id" , updateUser );
-
-// DELETE USER
-router.delete("/:id" , deleteUser);
-
+router.delete(
+    "/:id",
+    validateObjectId("id"),
+    deleteUser
+);
 
 module.exports = router;
