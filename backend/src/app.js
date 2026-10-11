@@ -2,6 +2,7 @@ const express = require("express");
 
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
+const cors = require("cors");
 
 const userRoutes = require("./routes/user.routes");
 const authRoutes = require("./routes/auth.routes");
@@ -38,6 +39,10 @@ const authLimiter = rateLimit({
 
 app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/register", authLimiter);
+
+app.use(cors({
+    origin: process.env.CLIENT_URL || "http://localhost:5173"
+}));
 
 app.get("/", (req, res) => {
     res.json({

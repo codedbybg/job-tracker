@@ -35,7 +35,7 @@ const createUser = async (req , res)=>{
 };
 
 // Get all users
-const getUser = async (req , res)=>{
+const getUsers = async (req , res)=>{
     try {
         const users = await User.find();
 
@@ -165,7 +165,7 @@ const deleteUser = async (req , res)=>{
 
 module.exports = {
     createUser,
-    getUser,
+    getUsers,
     baseRoute,
     getUserById,
     updateUser,
