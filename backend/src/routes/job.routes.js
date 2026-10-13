@@ -1,5 +1,13 @@
 const express = require("express");
-const {createJob , getJobs , getJobById , updateJob , deleteJob} = require("../controllers/job.controller");
+
+const {
+  createJob,
+  getJobs,
+  getJobById,
+  updateJob,
+  deleteJob,
+  getMyJobs,
+} = require("../controllers/job.controller");
 
 const protect = require("../middleware/auth.middleware");
 const authorizeRoles = require("../middleware/role.middleware");
@@ -7,35 +15,41 @@ const validateObjectId = require("../middleware/validateObjectId");
 
 const router = express.Router();
 
-// public
-router.get("/" , getJobs);
+// Public: get all jobs
+router.get("/", getJobs);
 
-router.get("/:id" , validateObjectId("id"), getJobById);
-
-// RECRUITER + ADMIN
-router.post(
-    "/" , 
-    protect , 
-    authorizeRoles("recruiter" , "admin") ,
-    createJob
+// Recruiter/Admin: get jobs owned by the logged-in recruiter
+// Admins will see only jobs owned by their own user ID with this query.
+router.get(
+  "/my-jobs",
+  protect,
+  authorizeRoles("recruiter", "admin"),
+  getMyJobs,
 );
 
-// RECRUITER + ADMIN
+// Public: get a single job
+// Keep this AFTER /my-jobs.
+router.get("/:id", validateObjectId("id"), getJobById);
+
+// Recruiter/Admin: create a job
+router.post("/", protect, authorizeRoles("recruiter", "admin"), createJob);
+
+// Recruiter/Admin: update a job
 router.put(
-    "/:id",
-    protect,
-    authorizeRoles("recruiter" , "admin"),
-    validateObjectId("id"),
-    updateJob
+  "/:id",
+  protect,
+  authorizeRoles("recruiter", "admin"),
+  validateObjectId("id"),
+  updateJob,
 );
 
-// RECRUITER + ADMIN
+// Recruiter/Admin: delete a job
 router.delete(
-    "/:id",
-    protect,
-    authorizeRoles("recruiter" , "admin"),
-    validateObjectId("id"),
-    deleteJob
+  "/:id",
+  protect,
+  authorizeRoles("recruiter", "admin"),
+  validateObjectId("id"),
+  deleteJob,
 );
 
 module.exports = router;

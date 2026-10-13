@@ -13,16 +13,19 @@ export default function Register() {
     password: "",
     phone: "",
     location: "",
+    role: "candidate",
   });
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleChange = (event) => {
-    setForm({
-      ...form,
-      [event.target.name]: event.target.value,
-    });
+    const { name, value } = event.target;
+
+    setForm((previousForm) => ({
+      ...previousForm,
+      [name]: value,
+    }));
   };
 
   const handleSubmit = async (event) => {
@@ -32,13 +35,21 @@ export default function Register() {
 
     try {
       await register(form);
+
       navigate("/login", {
-        state: { message: "Registration successful. Please log in." },
+        state: {
+          message: "Registration successful. Please log in.",
+        },
       });
     } catch (err) {
+      console.error("Registration error:", err);
+      console.error("Backend response:", err.response?.data);
+
       setError(
         err.response?.data?.message ||
-          "Registration failed. Please try again."
+          (err.request
+            ? "Cannot connect to the server. Check whether the backend is running."
+            : err.message || "Registration failed. Please try again.")
       );
     } finally {
       setLoading(false);
@@ -51,10 +62,7 @@ export default function Register() {
   return (
     <main className="flex min-h-screen items-center justify-center px-4 py-10">
       <section className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-9">
-        <Link
-          to="/"
-          className="text-sm font-semibold text-blue-700"
-        >
+        <Link to="/" className="text-sm font-semibold text-blue-700">
           ← JobTrack
         </Link>
 
@@ -63,7 +71,7 @@ export default function Register() {
         </h1>
 
         <p className="mt-2 text-sm text-slate-500">
-          Start tracking your job applications.
+          Join JobTrack to find jobs or hire candidates.
         </p>
 
         {error && (
@@ -75,10 +83,7 @@ export default function Register() {
           </p>
         )}
 
-        <form
-          onSubmit={handleSubmit}
-          className="mt-6 space-y-4"
-        >
+        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           <input
             className={inputClass}
             name="name"
@@ -134,7 +139,39 @@ export default function Register() {
             onChange={handleChange}
           />
 
+          {/* Account role selection */}
+          <div>
+            <label
+              htmlFor="role"
+              className="mb-2 block text-sm font-semibold text-slate-700"
+            >
+              Register as
+            </label>
+
+            <select
+              id="role"
+              name="role"
+              className={inputClass}
+              value={form.role}
+              onChange={handleChange}
+              required
+            >
+              <option value="candidate">
+                Candidate — Find jobs and apply
+              </option>
+              <option value="recruiter">
+                Recruiter — Post jobs and manage applicants
+              </option>
+            </select>
+
+            <p className="mt-2 text-xs text-slate-500">
+              Choose the account type that matches how you plan to use
+              JobTrack.
+            </p>
+          </div>
+
           <button
+            type="submit"
             disabled={loading}
             className="w-full rounded-xl bg-blue-700 px-4 py-3 font-semibold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
           >

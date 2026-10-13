@@ -6,7 +6,8 @@ const {
     updateApplicationStatus,
     getApplicationById,
     getMyApplicationStats,
-    getRecruiterApplicationStats
+    getRecruiterApplicationStats,
+    withdrawMyApplication
 } = require("../controllers/application.controller");
 
 const protect = require("../middleware/auth.middleware");
@@ -20,7 +21,7 @@ router.post(
     "/:jobId",
     protect,
     authorizeRoles("candidate"),
-    validateObjectId("id"),
+    validateObjectId("jobId"),
     applyForJob
 );
 
@@ -69,6 +70,14 @@ router.patch(
     protect,
     authorizeRoles("recruiter", "admin"),
     updateApplicationStatus
+);
+
+router.patch(
+    "/:id/withdraw",
+    protect,
+    authorizeRoles("candidate"),
+    validateObjectId("id"),
+    withdrawMyApplication
 );
 
 module.exports = router;

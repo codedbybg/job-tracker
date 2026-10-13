@@ -7,6 +7,11 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Register from "./pages/Register";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import Jobs from "./pages/Jobs";
+import JobDetails from "./pages/JobDetails";
+import MyApplications from "./pages/MyApplications";
+import RecruiterApplicants from "./pages/RecruiterApplicants";
+import CreateJob from "./pages/CreateJob";
 
 function Home() {
   const { user, loading } = useAuth();
@@ -72,6 +77,12 @@ export default function App() {
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="/jobs" element={<Jobs />} />
+      <Route path="/jobs" element={<Jobs />} />
+      <Route path="/jobs/create" element={<CreateJob />} />
+      <Route path="/jobs/:id" element={<JobDetails />} />
+      <Route path="/my-applications" element={<MyApplications />} />
+      <Route path="/recruiter/jobs/:jobId/applicants" element={<RecruiterApplicants />} />
     </Routes>
   );
 }

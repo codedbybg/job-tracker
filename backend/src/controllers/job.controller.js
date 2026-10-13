@@ -35,10 +35,10 @@ const createJob = async (req , res)=>{
             salaryMax !== undefined &&
             salaryMin > salaryMax
         ){
-            res.status(400).json({
-                success : false,
-                message : "Minimum salary cannot be greater than Maximum salary"
-            });
+            return res.status(400).json({
+  success: false,
+  message: "Minimum salary cannot be greater than Maximum salary"
+});
         }
 
         // 2. CREATING JOB
@@ -425,11 +425,35 @@ const deleteJob = async (req , res)=>{
 };
 
 
+const getMyJobs = async (req, res) => {
+  try {
+    // Find jobs created by the currently logged-in recruiter
+    const jobs = await Job.find({
+      recruiter: req.user.id,
+    }).sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      count: jobs.length,
+      data: jobs,
+    });
+  } catch (error) {
+    console.error("Get my jobs error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch your jobs",
+    });
+  }
+};
+
+
 
 module.exports = {
     createJob,
     getJobs,
     getJobById,
     updateJob,
-    deleteJob
+    deleteJob,
+    getMyJobs
 };

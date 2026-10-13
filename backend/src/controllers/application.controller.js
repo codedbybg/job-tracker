@@ -263,6 +263,59 @@ const updateApplicationStatus = async (req, res) => {
     }
 };
 
+// WITHDRAW MY APPLICATION
+const withdrawMyApplication = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const application = await Application.findById(id);
+
+    if (!application) {
+      return res.status(404).json({
+        success: false,
+        message: "Application not found",
+      });
+    }
+
+    // Only the candidate who submitted this application can withdraw it.
+    if (application.candidate.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only withdraw your own applications",
+      });
+    }
+
+    // Allow withdrawal only for these statuses.
+    const withdrawableStatuses = [
+      "applied",
+      "shortlisted",
+      "interview",
+    ];
+
+    if (!withdrawableStatuses.includes(application.status)) {
+      return res.status(400).json({
+        success: false,
+        message: `An application with status "${application.status}" cannot be withdrawn`,
+      });
+    }
+
+    application.status = "withdrawn";
+    await application.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Application withdrawn successfully",
+      data: application,
+    });
+  } catch (error) {
+    console.error("Withdraw application error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to withdraw application",
+    });
+  }
+};
 
 const getApplicationById = async (req, res) => {
     try {
@@ -512,5 +565,6 @@ module.exports = {
     updateApplicationStatus,
     getApplicationById,
     getMyApplicationStats,
-    getRecruiterApplicationStats
+    getRecruiterApplicationStats,
+    withdrawMyApplication
 };

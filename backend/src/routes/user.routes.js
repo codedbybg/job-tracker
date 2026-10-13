@@ -13,6 +13,16 @@ const validateObjectId = require("../middleware/validateObjectId");
 
 const router = express.Router();
 
+console.log("User route handler check:", {
+    getUsers: typeof getUsers,
+    getUserById: typeof getUserById,
+    updateUser: typeof updateUser,
+    deleteUser: typeof deleteUser,
+    protect: typeof protect,
+    authorizeRoles: typeof authorizeRoles,
+    validateObjectId: typeof validateObjectId
+});
+
 // All routes below require an administrator
 router.use(protect, authorizeRoles("admin"));
 
