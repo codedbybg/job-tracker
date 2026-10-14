@@ -1,6 +1,6 @@
 const Job = require("../models/Job");
 const User = require("../models/User");
-
+const Application = require("../models/Application");
 // CREATE JOB
 const createJob = async (req , res)=>{
     try {
@@ -425,17 +425,86 @@ const deleteJob = async (req , res)=>{
 };
 
 
+
 const getMyJobs = async (req, res) => {
   try {
-    // Find jobs created by the currently logged-in recruiter
     const jobs = await Job.find({
       recruiter: req.user.id,
     }).sort({ createdAt: -1 });
 
+    const stats = await Application.aggregate([
+      {
+        $match: {
+          job: { $in: jobs.map((job) => job._id) },
+        },
+      },
+      {
+        $group: {
+          _id: "$job",
+          totalApplicants: { $sum: 1 },
+          shortlisted: {
+            $sum: {
+              $cond: [
+                { $eq: ["$status", "shortlisted"] },
+                1,
+                0,
+              ],
+            },
+          },
+          interview: {
+            $sum: {
+              $cond: [
+                { $eq: ["$status", "interview"] },
+                1,
+                0,
+              ],
+            },
+          },
+          selected: {
+            $sum: {
+              $cond: [
+                { $eq: ["$status", "selected"] },
+                1,
+                0,
+              ],
+            },
+          },
+          rejected: {
+            $sum: {
+              $cond: [
+                { $eq: ["$status", "rejected"] },
+                1,
+                0,
+              ],
+            },
+          },
+        },
+      },
+    ]);
+
+    const statsMap = new Map(
+      stats.map((item) => [item._id.toString(), item])
+    );
+
+    const jobsWithStats = jobs.map((job) => {
+      const jobStats = statsMap.get(job._id.toString());
+
+      return {
+        ...job.toObject(),
+        applicantStats: {
+          totalApplicants: jobStats?.totalApplicants || 0,
+          shortlisted: jobStats?.shortlisted || 0,
+          interview: jobStats?.interview || 0,
+          selected: jobStats?.selected || 0,
+          rejected: jobStats?.rejected || 0,
+        },
+      };
+    });
+
     return res.status(200).json({
       success: true,
-      count: jobs.length,
-      data: jobs,
+      count: jobsWithStats.length,
+      data: jobsWithStats,
     });
   } catch (error) {
     console.error("Get my jobs error:", error);
@@ -446,6 +515,7 @@ const getMyJobs = async (req, res) => {
     });
   }
 };
+
 
 
 

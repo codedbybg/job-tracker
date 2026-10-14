@@ -169,7 +169,9 @@ export default function Dashboard() {
                 >
                   Create your first job
                 </Link>
+                
               </div>
+              
             )}
 
             {!loadingJobs && !jobsError && jobs.length > 0 && (
@@ -215,6 +217,37 @@ export default function Dashboard() {
                         View Applicants
                       </Link>
                     </div>
+                    
+<div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+  <div className="rounded-lg bg-gray-100 p-3">
+    <p className="text-sm text-gray-600">Applicants</p>
+    <p className="text-xl font-bold">
+      {job.applicantStats?.totalApplicants ?? 0}
+    </p>
+  </div>
+
+  <div className="rounded-lg bg-gray-100 p-3">
+    <p className="text-sm text-gray-600">Shortlisted</p>
+    <p className="text-xl font-bold">
+      {job.applicantStats?.shortlisted ?? 0}
+    </p>
+  </div>
+
+  <div className="rounded-lg bg-gray-100 p-3">
+    <p className="text-sm text-gray-600">Interviews</p>
+    <p className="text-xl font-bold">
+      {job.applicantStats?.interview ?? 0}
+    </p>
+  </div>
+
+  <div className="rounded-lg bg-gray-100 p-3">
+    <p className="text-sm text-gray-600">Selected</p>
+    <p className="text-xl font-bold">
+      {job.applicantStats?.selected ?? 0}
+    </p>
+  </div>
+</div>
+
                   </article>
                 ))}
               </div>
