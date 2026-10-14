@@ -3,290 +3,627 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { getMyJobs } from "../api/jobApi";
+import { getMyApplications } from "../api/applicationApi";
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
 
+  // Recruiter dashboard state
   const [jobs, setJobs] = useState([]);
-  const [loadingJobs, setLoadingJobs] = useState(false);
+  const [jobsLoading, setJobsLoading] = useState(false);
   const [jobsError, setJobsError] = useState("");
 
+  // Candidate dashboard state
+  const [applications, setApplications] = useState([]);
+  const [applicationLoading, setApplicationLoading] = useState(false);
+  const [applicationError, setApplicationError] = useState("");
+
+  const isCandidate = user?.role === "candidate";
   const isRecruiter = user?.role === "recruiter";
   const isAdmin = user?.role === "admin";
+  const canManageJobs = isRecruiter || isAdmin;
 
+  // Fetch jobs for recruiters and admins
   useEffect(() => {
-    if (!isRecruiter && !isAdmin) return;
+    if (!canManageJobs) return;
 
-    let active = true;
-
-    const fetchMyJobs = async () => {
-      setLoadingJobs(true);
+    const fetchJobs = async () => {
+      setJobsLoading(true);
       setJobsError("");
 
       try {
         const response = await getMyJobs();
 
-        if (!response.success || !Array.isArray(response.data)) {
-          throw new Error(response.message || "Failed to load your jobs.");
-        }
+        // Support both { data: [...] } and direct array responses.
+        const jobList = Array.isArray(response)
+          ? response
+          : Array.isArray(response?.data)
+            ? response.data
+            : [];
 
-        if (active) {
-          setJobs(response.data);
-        }
+        setJobs(jobList);
       } catch (error) {
-        if (active) {
-          setJobsError(
-            error.response?.data?.message ||
-              error.message ||
-              "Unable to load your jobs."
-          );
-        }
+        setJobsError(
+          error.response?.data?.message ||
+            "Failed to load your posted jobs."
+        );
       } finally {
-        if (active) {
-          setLoadingJobs(false);
-        }
+        setJobsLoading(false);
       }
     };
 
-    fetchMyJobs();
+    fetchJobs();
+  }, [canManageJobs]);
 
-    return () => {
-      active = false;
+  // Fetch applications for candidates
+  useEffect(() => {
+    if (!isCandidate) return;
+
+    const fetchApplications = async () => {
+      setApplicationLoading(true);
+      setApplicationError("");
+
+      try {
+        const response = await getMyApplications();
+
+        // Support both { data: [...] } and direct array responses.
+        const applicationList = Array.isArray(response)
+          ? response
+          : Array.isArray(response?.data)
+            ? response.data
+            : [];
+
+        setApplications(applicationList);
+      } catch (error) {
+        setApplicationError(
+          error.response?.data?.message ||
+            "Failed to load your applications."
+        );
+      } finally {
+        setApplicationLoading(false);
+      }
     };
-  }, [isRecruiter, isAdmin]);
+
+    fetchApplications();
+  }, [isCandidate]);
+
+  // Recruiter statistics
+  const recruiterStats = jobs.reduce(
+    (totals, job) => {
+      const stats = job.applicantStats || {};
+
+      totals.totalApplicants += stats.totalApplicants || 0;
+      totals.shortlisted += stats.shortlisted || 0;
+      totals.selected += stats.selected || 0;
+
+      return totals;
+    },
+    {
+      totalApplicants: 0,
+      shortlisted: 0,
+      selected: 0,
+    }
+  );
+
+  // Candidate statistics
+  const candidateStats = {
+    total: applications.length,
+
+    pending: applications.filter(
+      (application) =>
+        ["applied", "pending"].includes(application.status)
+    ).length,
+
+    shortlisted: applications.filter(
+      (application) => application.status === "shortlisted"
+    ).length,
+
+    selected: applications.filter(
+      (application) => application.status === "selected"
+    ).length,
+  };
+
+  const formatStatus = (status) => {
+    if (!status) return "Unknown";
+
+    return status
+      .replace(/[-_]/g, " ")
+      .replace(/\b\w/g, (character) => character.toUpperCase());
+  };
+
+  const getStatusClasses = (status) => {
+    switch (status) {
+      case "selected":
+        return "bg-green-100 text-green-700";
+
+      case "shortlisted":
+        return "bg-blue-100 text-blue-700";
+
+      case "interview":
+        return "bg-purple-100 text-purple-700";
+
+      case "rejected":
+        return "bg-red-100 text-red-700";
+
+      case "withdrawn":
+        return "bg-gray-200 text-gray-700";
+
+      case "pending":
+      case "applied":
+        return "bg-yellow-100 text-yellow-800";
+
+      default:
+        return "bg-gray-100 text-gray-700";
+    }
+  };
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-8">
-      <div className="mx-auto max-w-6xl">
+    <main className="min-h-screen bg-gray-50 px-4 py-8 sm:px-8">
+      <div className="mx-auto max-w-7xl">
         {/* Header */}
-        <header className="flex flex-wrap items-center justify-between gap-4">
+        <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <Link
             to="/"
-            className="text-2xl font-bold tracking-tight text-blue-700"
+            className="text-2xl font-bold text-blue-600"
           >
             JobTrack
           </Link>
 
-          <button
-            type="button"
-            onClick={logout}
-            className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-100"
-          >
-            Log out
-          </button>
+          <div className="flex items-center gap-4">
+            <span className="hidden text-sm text-gray-600 sm:inline">
+              {user?.email}
+            </span>
+
+            <button
+              type="button"
+              onClick={logout}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-100"
+            >
+              Log out
+            </button>
+          </div>
         </header>
 
         {/* Welcome section */}
-        <section className="mt-10 rounded-2xl bg-slate-900 p-7 text-white sm:p-10">
-          <p className="text-sm capitalize text-slate-300">
-            {user?.role || "User"} dashboard
+        <section className="mb-8 rounded-2xl bg-white p-6 shadow-sm sm:p-8">
+          <p className="mb-2 text-sm font-medium uppercase tracking-wide text-blue-600">
+            {formatStatus(user?.role)}
           </p>
 
-          <h1 className="mt-3 text-3xl font-bold sm:text-4xl">
+          <h1 className="text-3xl font-bold text-gray-900 sm:text-4xl">
             Welcome, {user?.name || "User"}!
           </h1>
 
-          <p className="mt-3 text-slate-300">
-            {isRecruiter
-              ? "Manage your job listings and find the right candidates."
-              : isAdmin
-                ? "Review your account and access JobTrack tools."
-                : "Discover opportunities and keep track of your applications."}
+          <p className="mt-3 text-gray-600">
+            {isCandidate
+              ? "Manage your job applications and find your next opportunity."
+              : isRecruiter
+                ? "Manage your job postings and track your candidates."
+                : "Review your dashboard and manage your job activity."}
           </p>
         </section>
 
         {/* Account information */}
-        <section className="mt-6 grid gap-4 sm:grid-cols-2">
-          <article className="rounded-2xl border border-slate-200 bg-white p-6">
-            <p className="text-sm text-slate-500">Account email</p>
-            <p className="mt-2 break-all font-semibold text-slate-900">
+        <section className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="rounded-xl border border-gray-200 bg-white p-5">
+            <p className="text-sm text-gray-500">Account Email</p>
+            <p className="mt-2 break-all font-semibold text-gray-900">
               {user?.email || "Not available"}
             </p>
-          </article>
+          </div>
 
-          <article className="rounded-2xl border border-slate-200 bg-white p-6">
-            <p className="text-sm text-slate-500">Account role</p>
-            <p className="mt-2 font-semibold capitalize text-slate-900">
+          <div className="rounded-xl border border-gray-200 bg-white p-5">
+            <p className="text-sm text-gray-500">Account Role</p>
+            <p className="mt-2 font-semibold capitalize text-gray-900">
               {user?.role || "Not available"}
             </p>
-          </article>
+          </div>
         </section>
 
-        {/* Recruiter dashboard */}
-        {isRecruiter && (
-          <section className="mt-10">
-            <div className="flex flex-wrap items-center justify-between gap-4">
+        {/* ================================================== */}
+        {/* RECRUITER AND ADMIN DASHBOARD                       */}
+        {/* ================================================== */}
+
+        {canManageJobs && (
+          <div className="space-y-8">
+            {/* Recruiter actions */}
+            <section className="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <h2 className="text-2xl font-bold text-slate-900">
-                  Your job listings
+                <h2 className="text-2xl font-bold text-gray-900">
+                  Hiring Dashboard
                 </h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  Manage the jobs you have posted.
+
+                <p className="mt-1 text-sm text-gray-600">
+                  Review your job postings and applicant activity.
                 </p>
               </div>
 
               <Link
                 to="/jobs/create"
-                className="rounded-xl bg-blue-700 px-5 py-3 font-semibold text-white hover:bg-blue-800"
+                className="rounded-lg bg-blue-600 px-5 py-3 font-medium text-white transition hover:bg-blue-700"
               >
                 + Post a Job
               </Link>
-            </div>
+            </section>
 
-            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <article className="rounded-2xl border border-slate-200 bg-white p-6">
-                <p className="text-sm text-slate-500">Jobs posted</p>
-                <p className="mt-2 text-3xl font-bold text-slate-900">
-                  {loadingJobs ? "…" : jobs.length}
-                </p>
-              </article>
-            </div>
+            {/* Recruiter summary cards */}
+            <section>
+              <h3 className="mb-4 text-xl font-semibold text-gray-900">
+                Hiring Overview
+              </h3>
 
-            {loadingJobs && (
-              <p className="mt-6 text-slate-500">Loading your jobs...</p>
-            )}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="rounded-xl border bg-white p-5 shadow-sm">
+                  <p className="text-sm text-gray-500">Jobs Posted</p>
+                  <p className="mt-2 text-3xl font-bold text-gray-900">
+                    {jobsLoading ? "—" : jobs.length}
+                  </p>
+                </div>
 
-            {jobsError && (
-              <div
-                role="alert"
-                className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700"
-              >
-                {jobsError}
+                <div className="rounded-xl border bg-white p-5 shadow-sm">
+                  <p className="text-sm text-gray-500">
+                    Total Applicants
+                  </p>
+                  <p className="mt-2 text-3xl font-bold text-gray-900">
+                    {jobsLoading
+                      ? "—"
+                      : recruiterStats.totalApplicants}
+                  </p>
+                </div>
+
+                <div className="rounded-xl border bg-white p-5 shadow-sm">
+                  <p className="text-sm text-gray-500">Shortlisted</p>
+                  <p className="mt-2 text-3xl font-bold text-gray-900">
+                    {jobsLoading
+                      ? "—"
+                      : recruiterStats.shortlisted}
+                  </p>
+                </div>
+
+                <div className="rounded-xl border bg-white p-5 shadow-sm">
+                  <p className="text-sm text-gray-500">Selected</p>
+                  <p className="mt-2 text-3xl font-bold text-gray-900">
+                    {jobsLoading
+                      ? "—"
+                      : recruiterStats.selected}
+                  </p>
+                </div>
               </div>
-            )}
+            </section>
 
-            {!loadingJobs && !jobsError && jobs.length === 0 && (
-              <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
-                <h3 className="text-lg font-semibold text-slate-900">
-                  No jobs posted yet
+            {/* Posted jobs */}
+            <section>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <h3 className="text-xl font-semibold text-gray-900">
+                  Your Posted Jobs
                 </h3>
-                <p className="mt-2 text-sm text-slate-500">
-                  Create your first job listing to start receiving applications.
-                </p>
+
                 <Link
-                  to="/jobs/create"
-                  className="mt-5 inline-block font-semibold text-blue-700 hover:underline"
+                  to="/jobs"
+                  className="text-sm font-medium text-blue-600 hover:underline"
                 >
-                  Create your first job
+                  Browse all jobs
                 </Link>
-                
               </div>
-              
-            )}
 
-            {!loadingJobs && !jobsError && jobs.length > 0 && (
-              <div className="mt-6 grid gap-5">
-                {jobs.map((job) => (
-                  <article
-                    key={job._id}
-                    className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+              {jobsLoading ? (
+                <div className="rounded-xl border bg-white p-8 text-center text-gray-500">
+                  Loading your jobs...
+                </div>
+              ) : jobsError ? (
+                <div className="rounded-xl border border-red-200 bg-white p-6">
+                  <p className="text-red-600">{jobsError}</p>
+
+                  <button
+                    type="button"
+                    onClick={() => window.location.reload()}
+                    className="mt-3 text-sm font-medium text-blue-600 hover:underline"
                   >
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <h3 className="text-xl font-bold text-slate-900">
-                          {job.title}
-                        </h3>
+                    Try again
+                  </button>
+                </div>
+              ) : jobs.length === 0 ? (
+                <div className="rounded-xl border border-dashed bg-white p-8 text-center">
+                  <h4 className="text-lg font-semibold text-gray-900">
+                    No jobs posted yet
+                  </h4>
 
-                        <p className="mt-1 text-slate-600">
-                          {job.company || "Company not specified"}
-                        </p>
+                  <p className="mt-2 text-gray-600">
+                    Publish your first job to start receiving applications.
+                  </p>
 
-                        <p className="mt-2 text-sm text-slate-500">
-                          {job.location || "Location not specified"}
-                          {job.jobType ? ` · ${job.jobType}` : ""}
-                        </p>
+                  <Link
+                    to="/jobs/create"
+                    className="mt-5 inline-block rounded-lg bg-blue-600 px-5 py-3 font-medium text-white hover:bg-blue-700"
+                  >
+                    Create Your First Job
+                  </Link>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                  {jobs.map((job) => (
+                    <article
+                      key={job._id}
+                      className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:shadow-md"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <h4 className="text-lg font-bold text-gray-900">
+                            {job.title}
+                          </h4>
+
+                          <p className="mt-1 text-sm text-gray-600">
+                            {job.company}
+                          </p>
+                        </div>
+
+                        {job.jobType && (
+                          <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
+                            {formatStatus(job.jobType)}
+                          </span>
+                        )}
                       </div>
 
-                      <span className="w-fit rounded-full bg-blue-50 px-3 py-1 text-sm font-medium capitalize text-blue-700">
-                        {job.status || "Posted"}
-                      </span>
-                    </div>
+                      <p className="mt-3 text-sm text-gray-500">
+                        <span className="mr-1">Location:</span>
+                        {job.location || "Not specified"}
+                      </p>
 
-                    <div className="mt-5 flex flex-wrap gap-3 border-t border-slate-100 pt-4">
-                      <Link
-                        to={`/jobs/${job._id}`}
-                        className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                      >
-                        View Job
-                      </Link>
+                      {/* Per-job applicant statistics */}
+                      <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                        {[
+                          {
+                            label: "Applicants",
+                            value:
+                              job.applicantStats?.totalApplicants ?? 0,
+                          },
+                          {
+                            label: "Shortlisted",
+                            value: job.applicantStats?.shortlisted ?? 0,
+                          },
+                          {
+                            label: "Interviews",
+                            value: job.applicantStats?.interview ?? 0,
+                          },
+                          {
+                            label: "Selected",
+                            value: job.applicantStats?.selected ?? 0,
+                          },
+                        ].map((stat) => (
+                          <div
+                            key={stat.label}
+                            className="rounded-lg bg-gray-50 p-3"
+                          >
+                            <p className="text-xs text-gray-500">
+                              {stat.label}
+                            </p>
 
-                      <Link
-                        to={`/recruiter/jobs/${job._id}/applicants`}
-                        className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800"
-                      >
-                        View Applicants
-                      </Link>
-                    </div>
-                    
-<div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-  <div className="rounded-lg bg-gray-100 p-3">
-    <p className="text-sm text-gray-600">Applicants</p>
-    <p className="text-xl font-bold">
-      {job.applicantStats?.totalApplicants ?? 0}
-    </p>
-  </div>
+                            <p className="mt-1 text-xl font-bold text-gray-900">
+                              {stat.value}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
 
-  <div className="rounded-lg bg-gray-100 p-3">
-    <p className="text-sm text-gray-600">Shortlisted</p>
-    <p className="text-xl font-bold">
-      {job.applicantStats?.shortlisted ?? 0}
-    </p>
-  </div>
+                      {/* Job actions */}
+                      <div className="mt-5 flex flex-wrap gap-3 border-t pt-4">
+                        <Link
+                          to={`/jobs/${job._id}`}
+                          className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-gray-50"
+                        >
+                          View Job
+                        </Link>
 
-  <div className="rounded-lg bg-gray-100 p-3">
-    <p className="text-sm text-gray-600">Interviews</p>
-    <p className="text-xl font-bold">
-      {job.applicantStats?.interview ?? 0}
-    </p>
-  </div>
+                        <Link
+                          to={`/recruiter/jobs/${job._id}/applicants`}
+                          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                        >
+                          View Applicants
+                        </Link>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
+        )}
 
-  <div className="rounded-lg bg-gray-100 p-3">
-    <p className="text-sm text-gray-600">Selected</p>
-    <p className="text-xl font-bold">
-      {job.applicantStats?.selected ?? 0}
-    </p>
-  </div>
-</div>
+        {/* ================================================== */}
+        {/* CANDIDATE DASHBOARD                                 */}
+        {/* ================================================== */}
 
-                  </article>
+        {isCandidate && (
+          <div className="space-y-8">
+            {/* Candidate actions */}
+            <section>
+              <h2 className="text-2xl font-bold text-gray-900">
+                Your Job Search
+              </h2>
+
+              <p className="mt-1 text-gray-600">
+                Discover opportunities and track your applications.
+              </p>
+
+              <div className="mt-5 flex flex-wrap gap-3">
+                <Link
+                  to="/jobs"
+                  className="rounded-lg bg-blue-600 px-5 py-3 font-medium text-white hover:bg-blue-700"
+                >
+                  Browse Jobs
+                </Link>
+
+                <Link
+                  to="/my-applications"
+                  className="rounded-lg border border-gray-300 bg-white px-5 py-3 font-medium hover:bg-gray-100"
+                >
+                  View All Applications
+                </Link>
+              </div>
+            </section>
+
+            {/* Candidate summary cards */}
+            <section>
+              <h3 className="mb-4 text-xl font-semibold text-gray-900">
+                Application Overview
+              </h3>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                {[
+                  {
+                    label: "Total Applications",
+                    value: candidateStats.total,
+                  },
+                  {
+                    label: "Pending Review",
+                    value: candidateStats.pending,
+                  },
+                  {
+                    label: "Shortlisted",
+                    value: candidateStats.shortlisted,
+                  },
+                  {
+                    label: "Selected",
+                    value: candidateStats.selected,
+                  },
+                ].map((stat) => (
+                  <div
+                    key={stat.label}
+                    className="rounded-xl border bg-white p-5 shadow-sm"
+                  >
+                    <p className="text-sm text-gray-500">
+                      {stat.label}
+                    </p>
+
+                    <p className="mt-2 text-3xl font-bold text-gray-900">
+                      {applicationLoading ? "—" : stat.value}
+                    </p>
+                  </div>
                 ))}
               </div>
-            )}
-          </section>
+            </section>
+
+            {/* Recent applications */}
+            <section>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <h3 className="text-xl font-semibold text-gray-900">
+                  Recent Applications
+                </h3>
+
+                {applications.length > 0 && (
+                  <Link
+                    to="/my-applications"
+                    className="text-sm font-medium text-blue-600 hover:underline"
+                  >
+                    View all
+                  </Link>
+                )}
+              </div>
+
+              {applicationLoading ? (
+                <div className="rounded-xl border bg-white p-8 text-center text-gray-500">
+                  Loading your applications...
+                </div>
+              ) : applicationError ? (
+                <div className="rounded-xl border border-red-200 bg-white p-6">
+                  <p className="text-red-600">{applicationError}</p>
+                </div>
+              ) : applications.length === 0 ? (
+                <div className="rounded-xl border border-dashed bg-white p-8 text-center">
+                  <h4 className="text-lg font-semibold text-gray-900">
+                    You haven't applied for any jobs yet
+                  </h4>
+
+                  <p className="mt-2 text-gray-600">
+                    Find a suitable opportunity and submit your first application.
+                  </p>
+
+                  <Link
+                    to="/jobs"
+                    className="mt-5 inline-block rounded-lg bg-blue-600 px-5 py-3 font-medium text-white hover:bg-blue-700"
+                  >
+                    Explore Jobs
+                  </Link>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {applications.slice(0, 5).map((application) => {
+                    const job =
+                      application.job &&
+                      typeof application.job === "object"
+                        ? application.job
+                        : null;
+
+                    return (
+                      <article
+                        key={application._id}
+                        className="flex flex-col justify-between gap-4 rounded-xl border bg-white p-5 shadow-sm sm:flex-row sm:items-center"
+                      >
+                        <div className="min-w-0">
+                          <h4 className="font-semibold text-gray-900">
+                            {job?.title || "Job title unavailable"}
+                          </h4>
+
+                          <p className="mt-1 text-sm text-gray-600">
+                            {job?.company || "Company unavailable"}
+                          </p>
+
+                          {job?.location && (
+                            <p className="mt-1 text-sm text-gray-500">
+                              {job.location}
+                            </p>
+                          )}
+
+                          <p className="mt-2 text-xs text-gray-500">
+                            Applied:{" "}
+                            {application.appliedAt
+                              ? new Date(
+                                  application.appliedAt
+                                ).toLocaleDateString()
+                              : "Date unavailable"}
+                          </p>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span
+                            className={`rounded-full px-3 py-1 text-sm font-medium ${getStatusClasses(
+                              application.status
+                            )}`}
+                          >
+                            {formatStatus(application.status)}
+                          </span>
+
+                          {job?._id && (
+                            <Link
+                              to={`/jobs/${job._id}`}
+                              className="text-sm font-medium text-blue-600 hover:underline"
+                            >
+                              View Job
+                            </Link>
+                          )}
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          </div>
         )}
 
-        {/* Candidate dashboard */}
-        {user?.role === "candidate" && (
-          <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6">
-            <h2 className="text-xl font-bold text-slate-900">
-              Your job search
+        {/* Unknown role fallback */}
+        {!isCandidate && !canManageJobs && (
+          <section className="rounded-xl border bg-white p-6">
+            <h2 className="text-xl font-semibold text-gray-900">
+              Dashboard unavailable
             </h2>
 
-            <p className="mt-2 text-sm text-slate-600">
-              Browse opportunities or review applications you have submitted.
+            <p className="mt-2 text-gray-600">
+              Your account role could not be identified. Please log in again
+              or contact the administrator.
             </p>
-
-            <div className="mt-5 flex flex-wrap gap-3">
-              <Link
-                to="/jobs"
-                className="rounded-xl bg-blue-700 px-5 py-3 font-semibold text-white hover:bg-blue-800"
-              >
-                Browse Jobs
-              </Link>
-
-              <Link
-                to="/my-applications"
-                className="rounded-xl border border-slate-300 px-5 py-3 font-semibold text-slate-700 hover:bg-slate-100"
-              >
-                My Applications
-              </Link>
-            </div>
           </section>
         )}
-
-        <p className="mt-8 text-sm text-slate-500">
-          Keep your JobTrack account details up to date.
-        </p>
       </div>
     </main>
   );

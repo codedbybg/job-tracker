@@ -1,14 +1,23 @@
+
 const mongoose = require("mongoose");
 const Application = require("../models/Application");
 const Job = require("../models/Job");
 
-// Apply for a job
-const applyForJob = async (req , res)=>{
+// APPLY FOR A JOB
+const applyForJob = async (req, res) => {
     try {
-        const {jobId} = req.params;
-        const {coverLetter = ""} = req.body;
+        // Security: only candidates can apply for jobs.
+        if (req.user.role !== "candidate") {
+            return res.status(403).json({
+                success: false,
+                message: "Only candidates can apply for jobs"
+            });
+        }
 
-         // Validate cover letter
+        const { jobId } = req.params;
+        const { coverLetter = "" } = req.body;
+
+        // Validate cover letter.
         if (
             typeof coverLetter !== "string" ||
             coverLetter.length > 2000
@@ -19,7 +28,7 @@ const applyForJob = async (req , res)=>{
             });
         }
 
-        // Check whether the job exists
+        // Find the job.
         const job = await Job.findById(jobId);
 
         if (!job) {
@@ -29,7 +38,7 @@ const applyForJob = async (req , res)=>{
             });
         }
 
-        // Check whether the job is open
+        // Check whether the job is open.
         if (job.status !== "open") {
             return res.status(409).json({
                 success: false,
@@ -37,20 +46,24 @@ const applyForJob = async (req , res)=>{
             });
         }
 
-        // Check the application deadline
-        if (new Date(job.deadline) < new Date()) {
+        // Validate and check the application deadline.
+        const deadlineTime = new Date(job.deadline).getTime();
+
+        if (
+            !Number.isFinite(deadlineTime) ||
+            deadlineTime <= Date.now()
+        ) {
             return res.status(409).json({
                 success: false,
-                message: "Application deadline has passed"
+                message: "Application deadline has passed or is invalid"
             });
         }
 
-        // Check for an existing application
-        const existingApplication =
-            await Application.findOne({
-                job: jobId,
-                candidate: req.user.id
-            });
+        // Check whether the candidate has already applied.
+        const existingApplication = await Application.findOne({
+            job: jobId,
+            candidate: req.user.id
+        });
 
         if (existingApplication) {
             return res.status(409).json({
@@ -59,27 +72,25 @@ const applyForJob = async (req , res)=>{
             });
         }
 
-        // Create application using authenticated user's ID
+        // Create the application using the authenticated user's ID.
         const application = await Application.create({
             job: jobId,
             candidate: req.user.id,
             coverLetter
         });
 
-        // Increase the job's applicant count
+        // Increase the job's applicant count.
         await Job.findByIdAndUpdate(jobId, {
             $inc: { applicantsCount: 1 }
         });
 
-        res.status(201).json({
+        return res.status(201).json({
             success: true,
             message: "Job application submitted successfully",
             data: application
         });
-
-
     } catch (error) {
-        // Handle duplicate-key errors, including concurrent requests
+        // Handle duplicate-key errors, including concurrent requests.
         if (error.code === 11000) {
             return res.status(409).json({
                 success: false,
@@ -87,12 +98,11 @@ const applyForJob = async (req , res)=>{
             });
         }
 
-        console.error(error);
+        console.error("Apply for job error:", error);
 
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
-            message: "Failed to submit application",
-            error: error.message
+            message: "Failed to submit application"
         });
     }
 };
@@ -109,29 +119,26 @@ const getMyApplications = async (req, res) => {
             )
             .sort({ appliedAt: -1 });
 
-        res.status(200).json({
+        return res.status(200).json({
             success: true,
             count: applications.length,
             data: applications
         });
-
     } catch (error) {
-        console.error(error);
+        console.error("Get my applications error:", error);
 
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
-            message: "Failed to fetch your applications",
-            error: error.message
+            message: "Failed to fetch your applications"
         });
     }
 };
 
-
+// GET APPLICANTS FOR A JOB
 const getApplicantsForJob = async (req, res) => {
     try {
         const { jobId } = req.params;
 
-        // Find the job
         const job = await Job.findById(jobId);
 
         if (!job) {
@@ -141,12 +148,9 @@ const getApplicantsForJob = async (req, res) => {
             });
         }
 
-        // Check job ownership
-        const isOwner =
-            job.recruiter.toString() === req.user.id;
-
-        const isAdmin =
-            req.user.role === "admin";
+        // Only the job owner or an admin can view applicants.
+        const isOwner = job.recruiter.toString() === req.user.id;
+        const isAdmin = req.user.role === "admin";
 
         if (!isOwner && !isAdmin) {
             return res.status(403).json({
@@ -155,7 +159,6 @@ const getApplicantsForJob = async (req, res) => {
             });
         }
 
-        // Find applications and populate candidate details
         const applications = await Application.find({
             job: jobId
         })
@@ -169,24 +172,22 @@ const getApplicantsForJob = async (req, res) => {
             )
             .sort({ appliedAt: -1 });
 
-        res.status(200).json({
+        return res.status(200).json({
             success: true,
             count: applications.length,
             data: applications
         });
-
     } catch (error) {
-        console.error(error);
+        console.error("Get applicants error:", error);
 
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
-            message: "Failed to fetch applicants",
-            error: error.message
+            message: "Failed to fetch applicants"
         });
     }
 };
 
-
+// UPDATE APPLICATION STATUS
 const updateApplicationStatus = async (req, res) => {
     try {
         const { id } = req.params;
@@ -199,7 +200,6 @@ const updateApplicationStatus = async (req, res) => {
             "rejected"
         ];
 
-        // Validate requested status
         if (!allowedStatuses.includes(status)) {
             return res.status(400).json({
                 success: false,
@@ -207,7 +207,6 @@ const updateApplicationStatus = async (req, res) => {
             });
         }
 
-        // Find the application
         const application = await Application.findById(id);
 
         if (!application) {
@@ -217,7 +216,6 @@ const updateApplicationStatus = async (req, res) => {
             });
         }
 
-        // Find the associated job
         const job = await Job.findById(application.job);
 
         if (!job) {
@@ -227,12 +225,8 @@ const updateApplicationStatus = async (req, res) => {
             });
         }
 
-        // Check ownership or admin access
-        const isOwner =
-            job.recruiter.toString() === req.user.id;
-
-        const isAdmin =
-            req.user.role === "admin";
+        const isOwner = job.recruiter.toString() === req.user.id;
+        const isAdmin = req.user.role === "admin";
 
         if (!isOwner && !isAdmin) {
             return res.status(403).json({
@@ -241,82 +235,78 @@ const updateApplicationStatus = async (req, res) => {
             });
         }
 
-        // Update status
         application.status = status;
-
         await application.save();
 
-        res.status(200).json({
+        return res.status(200).json({
             success: true,
             message: "Application status updated successfully",
             data: application
         });
-
     } catch (error) {
-        console.error(error);
+        console.error("Update application status error:", error);
 
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
-            message: "Failed to update application status",
-            error: error.message
+            message: "Failed to update application status"
         });
     }
 };
 
 // WITHDRAW MY APPLICATION
 const withdrawMyApplication = async (req, res) => {
-  try {
-    const { id } = req.params;
+    try {
+        const { id } = req.params;
 
-    const application = await Application.findById(id);
+        const application = await Application.findById(id);
 
-    if (!application) {
-      return res.status(404).json({
-        success: false,
-        message: "Application not found",
-      });
+        if (!application) {
+            return res.status(404).json({
+                success: false,
+                message: "Application not found"
+            });
+        }
+
+        // Only the candidate who submitted the application can withdraw it.
+        if (application.candidate.toString() !== req.user.id) {
+            return res.status(403).json({
+                success: false,
+                message: "You can only withdraw your own applications"
+            });
+        }
+
+        const withdrawableStatuses = [
+            "applied",
+            "shortlisted",
+            "interview"
+        ];
+
+        if (!withdrawableStatuses.includes(application.status)) {
+            return res.status(400).json({
+                success: false,
+                message: `An application with status "${application.status}" cannot be withdrawn`
+            });
+        }
+
+        application.status = "withdrawn";
+        await application.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Application withdrawn successfully",
+            data: application
+        });
+    } catch (error) {
+        console.error("Withdraw application error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to withdraw application"
+        });
     }
-
-    // Only the candidate who submitted this application can withdraw it.
-    if (application.candidate.toString() !== req.user.id) {
-      return res.status(403).json({
-        success: false,
-        message: "You can only withdraw your own applications",
-      });
-    }
-
-    // Allow withdrawal only for these statuses.
-    const withdrawableStatuses = [
-      "applied",
-      "shortlisted",
-      "interview",
-    ];
-
-    if (!withdrawableStatuses.includes(application.status)) {
-      return res.status(400).json({
-        success: false,
-        message: `An application with status "${application.status}" cannot be withdrawn`,
-      });
-    }
-
-    application.status = "withdrawn";
-    await application.save();
-
-    return res.status(200).json({
-      success: true,
-      message: "Application withdrawn successfully",
-      data: application,
-    });
-  } catch (error) {
-    console.error("Withdraw application error:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Failed to withdraw application",
-    });
-  }
 };
 
+// GET APPLICATION BY ID
 const getApplicationById = async (req, res) => {
     try {
         const { id } = req.params;
@@ -354,23 +344,21 @@ const getApplicationById = async (req, res) => {
             });
         }
 
-        res.status(200).json({
+        return res.status(200).json({
             success: true,
             data: application
         });
-
     } catch (error) {
-        console.error(error);
+        console.error("Get application error:", error);
 
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
-            message: "Failed to fetch application",
-            error: error.message
+            message: "Failed to fetch application"
         });
     }
 };
 
-
+// GET MY APPLICATION STATISTICS
 const getMyApplicationStats = async (req, res) => {
     try {
         const candidateId = req.user.id;
@@ -384,10 +372,7 @@ const getMyApplicationStats = async (req, res) => {
             {
                 $group: {
                     _id: null,
-
-                    total: {
-                        $sum: 1
-                    },
+                    total: { $sum: 1 },
 
                     applied: {
                         $sum: {
@@ -464,7 +449,7 @@ const getMyApplicationStats = async (req, res) => {
             }
         ]);
 
-        res.status(200).json({
+        return res.status(200).json({
             success: true,
             data: stats[0] || {
                 total: 0,
@@ -476,22 +461,19 @@ const getMyApplicationStats = async (req, res) => {
                 withdrawn: 0
             }
         });
-
     } catch (error) {
-        console.error(error);
+        console.error("Candidate application stats error:", error);
 
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
-            message: "Failed to fetch application statistics",
-            error: error.message
+            message: "Failed to fetch application statistics"
         });
     }
 };
 
-
+// GET RECRUITER APPLICATION STATISTICS
 const getRecruiterApplicationStats = async (req, res) => {
     try {
-        // Find jobs belonging to the logged-in recruiter
         const recruiterJobs = await Job.find({
             recruiter: req.user.id
         }).select("_id");
@@ -541,22 +523,19 @@ const getRecruiterApplicationStats = async (req, res) => {
             result.total += item.count;
         }
 
-        res.status(200).json({
+        return res.status(200).json({
             success: true,
             data: result
         });
-
     } catch (error) {
-        console.error(error);
+        console.error("Recruiter application stats error:", error);
 
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
-            message: "Failed to fetch recruiter statistics",
-            error: error.message
+            message: "Failed to fetch recruiter statistics"
         });
     }
 };
-
 
 module.exports = {
     applyForJob,

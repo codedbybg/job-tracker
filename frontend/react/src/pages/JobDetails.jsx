@@ -1,254 +1,371 @@
-import { useEffect, useState } from "react";
+
+import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { getJobById } from "../api/jobApi";
-import api from "../api/axios";
+import { applyForJob } from "../api/applicationApi";
+import { useAuth } from "../context/AuthContext";
+
+function formatLabel(value) {
+  if (!value) return "Not specified";
+
+  return String(value)
+    .replace(/[-_]/g, " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function formatSalary(min, max) {
+  if (min == null && max == null) {
+    return "Not specified";
+  }
+
+  const formatAmount = (amount) =>
+    new Intl.NumberFormat("en-IN", {
+      maximumFractionDigits: 0,
+    }).format(amount);
+
+  if (min != null && max != null) {
+    return `₹${formatAmount(min)} – ₹${formatAmount(max)}`;
+  }
+
+  if (min != null) {
+    return `From ₹${formatAmount(min)}`;
+  }
+
+  return `Up to ₹${formatAmount(max)}`;
+}
+
+function formatDate(value) {
+  if (!value) return "Not specified";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Not specified";
+  }
+
+  return date.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
 
 export default function JobDetails() {
   const { id } = useParams();
+  const { user } = useAuth();
 
   const [job, setJob] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
-  const [coverLetter, setCoverLetter] = useState("");
   const [applying, setApplying] = useState(false);
   const [applyMessage, setApplyMessage] = useState("");
   const [applyError, setApplyError] = useState("");
+  const [alreadyApplied, setAlreadyApplied] = useState(false);
 
-  const handleApply = async (e) => {
-    e.preventDefault();
+  const fetchJob = useCallback(async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await getJobById(id);
+      const jobData = response?.data;
+
+      if (!jobData || typeof jobData !== "object") {
+        throw new Error("Job details are unavailable.");
+      }
+
+      setJob(jobData);
+    } catch (err) {
+      setJob(null);
+      setError(
+        err.response?.data?.message ||
+          err.message ||
+          "Failed to load job details."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    fetchJob();
+  }, [fetchJob]);
+
+  const handleApply = async () => {
+    if (!user) {
+      setApplyError("Please log in to apply for this job.");
+      return;
+    }
+
+    if (user.role !== "candidate") {
+      setApplyError("Only candidate accounts can apply for jobs.");
+      return;
+    }
 
     setApplying(true);
     setApplyMessage("");
     setApplyError("");
 
     try {
+      const response = await applyForJob(id);
 
-        console.log("Job ID from URL:", id);
-        console.log("Job ID type:", typeof id);
-        console.log("Application API URL:", `/applications/${id}`);
-
-      const response = await api.post(`/applications/${id}`, { coverLetter });
-
-      if (response.data.success) {
-        setApplyMessage(
-          response.data.message || "Application submitted successfully!",
-        );
-        setCoverLetter("");
-      } else {
-        setApplyError(
-          response.data.message || "Could not submit your application.",
-        );
-      }
-    } catch (error) {
-      setApplyError(
-        error.response?.data?.message ||
-          "Application failed. Please try again.",
+      setApplyMessage(
+        response?.message || "Your application was submitted successfully."
       );
+
+      setAlreadyApplied(true);
+    } catch (err) {
+      const message =
+        err.response?.data?.message ||
+        "Unable to submit your application.";
+
+      if (
+        err.response?.status === 409 ||
+        /already applied|duplicate application/i.test(message)
+      ) {
+        setAlreadyApplied(true);
+        setApplyMessage("You have already applied for this job.");
+      } else {
+        setApplyError(message);
+      }
     } finally {
       setApplying(false);
     }
   };
 
-  useEffect(() => {
-    const fetchJob = async () => {
-      try {
-        setLoading(true);
-        setError("");
-
-        const response = await getJobById(id);
-
-        // Supports { data: job } or { data: { job: job } }
-        const payload = response.data;
-        const jobData = payload?._id ? payload : payload?.job;
-
-        if (!jobData?._id) {
-          throw new Error(
-            "Unexpected job details response. Check your backend API.",
-          );
-        }
-
-        setJob(jobData);
-      } catch (err) {
-        console.error("Fetch job details error:", err);
-
-        setError(
-          err.response?.data?.message ||
-            "Unable to load job details. The job may not exist.",
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (id) fetchJob();
-  }, [id]);
-
   if (loading) {
     return (
-      <main className="mx-auto max-w-4xl px-4 py-12">
-        <p className="text-slate-600">Loading job details...</p>
+      <main className="min-h-screen bg-gray-50 px-4 py-12">
+        <div className="mx-auto max-w-5xl rounded-xl border bg-white p-8 text-center text-gray-500">
+          Loading job details...
+        </div>
       </main>
     );
   }
 
   if (error || !job) {
     return (
-      <main className="mx-auto max-w-4xl px-4 py-12">
-        <h1 className="text-2xl font-bold">Job details unavailable</h1>
+      <main className="min-h-screen bg-gray-50 px-4 py-12">
+        <div className="mx-auto max-w-3xl rounded-xl border bg-white p-8 text-center">
+          <h1 className="text-2xl font-bold text-gray-900">
+            Job details unavailable
+          </h1>
 
-        <p role="alert" className="mt-3 text-red-600">
-          {error || "This job could not be found."}
-        </p>
+          <p className="mt-3 text-gray-600">
+            {error || "This job could not be found."}
+          </p>
 
-        <Link
-          to="/jobs"
-          className="mt-5 inline-block font-semibold text-blue-700"
-        >
-          ← Back to jobs
-        </Link>
+          <Link
+            to="/jobs"
+            className="mt-6 inline-block rounded-lg bg-blue-600 px-5 py-3 font-medium text-white hover:bg-blue-700"
+          >
+            Back to Jobs
+          </Link>
+        </div>
       </main>
     );
   }
 
-  const salary =
-    job.salaryMin != null || job.salaryMax != null
-      ? `${job.salaryMin ?? "—"} – ${job.salaryMax ?? "—"}`
-      : "Not disclosed";
+  const skills = Array.isArray(job.skills)
+    ? job.skills
+    : typeof job.skills === "string"
+      ? job.skills.split(",").map((skill) => skill.trim()).filter(Boolean)
+      : [];
 
-  const skills = Array.isArray(job.skills) ? job.skills : [];
+  const isExpired =
+    job.deadline &&
+    !Number.isNaN(new Date(job.deadline).getTime()) &&
+    new Date(job.deadline).getTime() < new Date().setHours(0, 0, 0, 0);
+
+  const canApply = user?.role === "candidate";
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-10">
-      <div className="mx-auto max-w-4xl">
-        <Link to="/jobs" className="font-medium text-blue-700 hover:underline">
-          ← Back to jobs
+    <main className="min-h-screen bg-gray-50 px-4 py-8 sm:px-8">
+      <div className="mx-auto max-w-5xl">
+        <Link
+          to="/jobs"
+          className="inline-block text-sm font-medium text-blue-600 hover:underline"
+        >
+          ← Back to Jobs
         </Link>
 
-        <article className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-9">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-slate-900">{job.title}</h1>
-
-              <p className="mt-2 text-lg font-semibold text-blue-700">
-                {job.company}
-              </p>
-            </div>
-
-            <span className="rounded-full bg-blue-50 px-3 py-1 text-sm font-medium capitalize text-blue-700">
-              {job.jobType || "Job"}
-            </span>
-          </div>
-
-          <div className="mt-6 grid gap-4 rounded-xl bg-slate-50 p-4 sm:grid-cols-2">
-            <div>
-              <p className="text-sm text-slate-500">Location</p>
-              <p className="mt-1 font-medium">
-                {job.location || "Not specified"}
-              </p>
-            </div>
-
-            <div>
-              <p className="text-sm text-slate-500">Salary</p>
-              <p className="mt-1 font-medium">{salary}</p>
-            </div>
-
-            <div>
-              <p className="text-sm text-slate-500">Minimum experience</p>
-              <p className="mt-1 font-medium">
-                {job.experienceMin != null
-                  ? `${job.experienceMin} years`
-                  : "Not specified"}
-              </p>
-            </div>
-
-            <div>
-              <p className="text-sm text-slate-500">Status</p>
-              <p className="mt-1 font-medium capitalize">
-                {job.status || "Not specified"}
-              </p>
-            </div>
-          </div>
-
-          <section className="mt-8">
-            <h2 className="text-xl font-bold">Job Description</h2>
-            <p className="mt-3 whitespace-pre-line leading-7 text-slate-600">
-              {job.description || "No description available."}
-            </p>
-          </section>
-
-          <section className="mt-8">
-            <h2 className="text-xl font-bold">Required Skills</h2>
-
-            {skills.length > 0 ? (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {skills.map((skill, index) => (
-                  <span
-                    key={`${skill}-${index}`}
-                    className="rounded-full bg-slate-100 px-3 py-2 text-sm text-slate-700"
-                  >
-                    {skill}
+        <section className="mt-5 overflow-hidden rounded-2xl border bg-white shadow-sm">
+          <div className="border-b bg-gradient-to-r from-blue-50 to-white p-6 sm:p-9">
+            <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-start">
+              <div>
+                <div className="mb-3 flex flex-wrap gap-2">
+                  <span className="rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-700">
+                    {formatLabel(job.jobType)}
                   </span>
-                ))}
-              </div>
-            ) : (
-              <p className="mt-3 text-slate-500">Skills not specified.</p>
-            )}
-          </section>
 
-          {job.deadline && (
-            <section className="mt-8">
-              <h2 className="text-xl font-bold">Application Deadline</h2>
-              <p className="mt-2 text-slate-600">
-                {new Date(job.deadline).toLocaleDateString()}
+                  {isExpired && (
+                    <span className="rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-700">
+                      Application Deadline Passed
+                    </span>
+                  )}
+                </div>
+
+                <h1 className="text-3xl font-bold text-gray-900 sm:text-4xl">
+                  {job.title}
+                </h1>
+
+                <p className="mt-3 text-lg font-medium text-gray-700">
+                  {job.company}
+                </p>
+
+                <p className="mt-2 text-sm text-gray-500">
+                  {job.location || "Location not specified"}
+                </p>
+              </div>
+
+              <div className="shrink-0">
+                {canApply ? (
+                  <button
+                    type="button"
+                    onClick={handleApply}
+                    disabled={applying || alreadyApplied || Boolean(isExpired)}
+                    className="w-full rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400 sm:w-auto"
+                  >
+                    {applying
+                      ? "Submitting..."
+                      : alreadyApplied
+                        ? "Already Applied"
+                        : isExpired
+                          ? "Applications Closed"
+                          : "Apply Now"}
+                  </button>
+                ) : !user ? (
+                  <Link
+                    to="/login"
+                    className="inline-block rounded-lg bg-blue-600 px-6 py-3 text-center font-semibold text-white hover:bg-blue-700"
+                  >
+                    Log in to Apply
+                  </Link>
+                ) : (
+                  <p className="rounded-lg bg-gray-100 px-4 py-3 text-sm text-gray-600">
+                    Recruiter accounts cannot apply.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 border-b p-6 sm:grid-cols-3 sm:p-8">
+            <div className="rounded-xl bg-gray-50 p-4">
+              <p className="text-sm text-gray-500">Salary Range</p>
+              <p className="mt-2 font-semibold text-gray-900">
+                {formatSalary(job.salaryMin, job.salaryMax)}
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-gray-50 p-4">
+              <p className="text-sm text-gray-500">Minimum Experience</p>
+              <p className="mt-2 font-semibold text-gray-900">
+                {job.experienceMin == null
+                  ? "Not specified"
+                  : `${job.experienceMin} ${
+                      Number(job.experienceMin) === 1 ? "year" : "years"
+                    }`}
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-gray-50 p-4">
+              <p className="text-sm text-gray-500">Application Deadline</p>
+              <p className="mt-2 font-semibold text-gray-900">
+                {formatDate(job.deadline)}
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-8 p-6 sm:p-8">
+            <section>
+              <h2 className="text-xl font-bold text-gray-900">
+                Job Description
+              </h2>
+
+              <p className="mt-3 whitespace-pre-line leading-7 text-gray-600">
+                {job.description || "No description provided."}
               </p>
             </section>
-          )}
 
-          <div className="mt-9 border-t border-slate-200 pt-6">
-            <p className="text-sm text-slate-500">
-              Ready to apply? Make sure you're logged in as a candidate.
-            </p>
+            <section>
+              <h2 className="text-xl font-bold text-gray-900">
+                Required Skills
+              </h2>
 
-            <Link
-              to="/login"
-              className="mt-4 inline-block rounded-xl bg-blue-700 px-6 py-3 font-semibold text-white transition hover:bg-blue-800"
-            >
-              Log in to Apply
-            </Link>
+              {skills.length > 0 ? (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {skills.map((skill, index) => (
+                    <span
+                      key={`${skill}-${index}`}
+                      className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700"
+                    >
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-3 text-gray-500">
+                  No specific skills listed.
+                </p>
+              )}
+            </section>
+
+            {job.createdAt && (
+              <section className="border-t pt-5">
+                <p className="text-sm text-gray-500">
+                  Posted on {formatDate(job.createdAt)}
+                </p>
+              </section>
+            )}
+
+            {applyMessage && (
+              <div
+                role="status"
+                className="rounded-lg bg-green-50 p-4 text-sm text-green-700"
+              >
+                {applyMessage}
+                {alreadyApplied && (
+                  <Link
+                    to="/my-applications"
+                    className="ml-2 font-semibold underline"
+                  >
+                    View Applications
+                  </Link>
+                )}
+              </div>
+            )}
+
+            {applyError && (
+              <div
+                role="alert"
+                className="rounded-lg bg-red-50 p-4 text-sm text-red-700"
+              >
+                {applyError}
+                {!user && (
+                  <Link
+                    to="/login"
+                    className="ml-2 font-semibold underline"
+                  >
+                    Log in
+                  </Link>
+                )}
+              </div>
+            )}
+
+            {canApply && !isExpired && !alreadyApplied && (
+              <div className="border-t pt-6">
+                <button
+                  type="button"
+                  onClick={handleApply}
+                  disabled={applying}
+                  className="w-full rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400 sm:w-auto"
+                >
+                  {applying ? "Submitting..." : "Apply for This Position"}
+                </button>
+              </div>
+            )}
           </div>
-        </article>
-        <section className="mt-8 rounded-xl border border-gray-200 p-6 dark:border-gray-700">
-          <h2 className="mb-4 text-2xl font-bold">Apply for this Job</h2>
-
-          <form onSubmit={handleApply} className="space-y-4">
-            <div>
-              <label htmlFor="coverLetter" className="mb-2 block font-medium">
-                Cover Letter
-              </label>
-
-              <textarea
-                id="coverLetter"
-                value={coverLetter}
-                onChange={(e) => setCoverLetter(e.target.value)}
-                placeholder="Tell the recruiter why you're a good fit..."
-                rows={5}
-                className="w-full rounded-lg border border-gray-300 bg-transparent p-3 outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            {applyMessage && <p className="text-green-600">{applyMessage}</p>}
-
-            {applyError && <p className="text-red-600">{applyError}</p>}
-
-            <button
-              type="submit"
-              disabled={applying}
-              className="rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {applying ? "Submitting..." : "Submit Application"}
-            </button>
-          </form>
         </section>
       </div>
     </main>
