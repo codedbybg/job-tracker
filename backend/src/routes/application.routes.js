@@ -1,13 +1,14 @@
 const express = require("express");
+
 const {
     applyForJob,
-    getMyApplications , 
-    getApplicantsForJob , 
+    getMyApplications,
+    getApplicantsForJob,
     updateApplicationStatus,
     getApplicationById,
     getMyApplicationStats,
     getRecruiterApplicationStats,
-    withdrawMyApplication
+    withdrawMyApplication,
 } = require("../controllers/application.controller");
 
 const protect = require("../middleware/auth.middleware");
@@ -16,16 +17,18 @@ const validateObjectId = require("../middleware/validateObjectId");
 
 const router = express.Router();
 
-// Candidate applies for a job
+// Candidate applies for a job.
+// POST /api/applications
+// Request body: { jobId, coverLetter }
 router.post(
-    "/:jobId",
+    "/",
     protect,
     authorizeRoles("candidate"),
-    validateObjectId("jobId"),
     applyForJob
 );
 
-// Candidate views their own applications
+// Candidate views their own applications.
+// GET /api/applications/my
 router.get(
     "/my",
     protect,
@@ -33,15 +36,8 @@ router.get(
     getMyApplications
 );
 
-// Recruiter/Admin: view applicants for a job
-router.get(
-    "/job/:jobId",
-    protect,
-    authorizeRoles("recruiter", "admin"),
-    getApplicantsForJob
-);
-
-
+// Candidate views their application statistics.
+// GET /api/applications/my/stats
 router.get(
     "/my/stats",
     protect,
@@ -49,6 +45,8 @@ router.get(
     getMyApplicationStats
 );
 
+// Recruiter/Admin views application statistics.
+// GET /api/applications/recruiter/stats
 router.get(
     "/recruiter/stats",
     protect,
@@ -56,28 +54,44 @@ router.get(
     getRecruiterApplicationStats
 );
 
+// Recruiter/Admin views applicants for a job.
+// GET /api/applications/job/:jobId
 router.get(
-    "/:id",
+    "/job/:jobId",
     protect,
-    authorizeRoles("candidate", "recruiter", "admin"),
-    getApplicationById
+    authorizeRoles("recruiter", "admin"),
+    validateObjectId("jobId"),
+    getApplicantsForJob
 );
 
-
-// Recruiter/Admin: update application status
+// Recruiter/Admin updates application status.
+// PATCH /api/applications/:id/status
 router.patch(
     "/:id/status",
     protect,
     authorizeRoles("recruiter", "admin"),
+    validateObjectId("id"),
     updateApplicationStatus
 );
 
+// Candidate withdraws their application.
+// PATCH /api/applications/:id/withdraw
 router.patch(
     "/:id/withdraw",
     protect,
     authorizeRoles("candidate"),
     validateObjectId("id"),
     withdrawMyApplication
+);
+
+// Get a specific application.
+// GET /api/applications/:id
+router.get(
+    "/:id",
+    protect,
+    authorizeRoles("candidate", "recruiter", "admin"),
+    validateObjectId("id"),
+    getApplicationById
 );
 
 module.exports = router;

@@ -17,7 +17,7 @@ const errorHandler = (err, req, res, next) => {
         });
     }
 
-    // Payload too large
+    // Request body too large
     if (err.status === 413) {
         return res.status(413).json({
             success: false,
@@ -59,11 +59,12 @@ const errorHandler = (err, req, res, next) => {
             ? err.statusCode
             : 500;
 
-    res.status(statusCode).json({
+    return res.status(statusCode).json({
         success: false,
-        message: statusCode === 500
-            ? "Internal server error"
-            : err.message
+        message:
+            statusCode === 500
+                ? "Internal server error"
+                : err.message
     });
 };
 

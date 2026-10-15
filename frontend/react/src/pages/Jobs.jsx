@@ -120,9 +120,15 @@ export default function Jobs() {
           <h1 className="text-3xl font-bold text-slate-900">
             Find Your Next Job
           </h1>
-          <p className="mt-2 text-slate-600">
+          <p className="mt-2 text-slate-600 mb-5">
             Search opportunities that match your skills and interests.
           </p>
+          <Link
+              to="/dashboard"
+              className="text-sm font-medium text-blue-600 hover:underline"
+            >
+              ← Back to Dashboard
+            </Link>
         </header>
 
         {/* Search and filters */}

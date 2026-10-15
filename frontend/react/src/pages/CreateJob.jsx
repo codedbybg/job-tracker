@@ -73,15 +73,23 @@ const handleSubmit = async (event) => {
     }
 
     navigate("/dashboard");
-  } catch (err) {
-    setError(
-      err.response?.data?.message ||
-        err.message ||
-        "Unable to create the job."
-    );
-  } finally {
-    setLoading(false);
-  }
+} catch (err) {
+    const responseData = err.response?.data;
+
+    const validationErrors = responseData?.errors;
+
+    if (Array.isArray(validationErrors) && validationErrors.length > 0) {
+      setError(
+        `${responseData.message || "Job validation failed"}: ${validationErrors.join(", ")}`
+      );
+    } else {
+      setError(
+        responseData?.message ||
+          err.message ||
+          "Unable to create the job."
+      );
+    }
+}
 };
 
 

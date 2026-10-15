@@ -1,26 +1,30 @@
+
 const mongoose = require("mongoose");
 
 const applicationSchema = new mongoose.Schema(
     {
-        job : {
-            type : mongoose.Schema.Types.ObjectId,
-            ref : "Job",
-            required : true
-        },
-        candidate : {
-            type : mongoose.Schema.Types.ObjectId,
-            ref : "User",
+        job: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Job",
             required: true
         },
-        coverLetter : {
-            type : String,
-            trim : true,
-            max_length : 2000,
-            default : ""
+
+        candidate: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+            required: true
         },
-        status : {
-            type : String,
-            enum : [
+
+        coverLetter: {
+            type: String,
+            trim: true,
+            maxlength: 2000,
+            default: ""
+        },
+
+        status: {
+            type: String,
+            enum: [
                 "applied",
                 "shortlisted",
                 "interview",
@@ -28,24 +32,28 @@ const applicationSchema = new mongoose.Schema(
                 "rejected",
                 "withdrawn"
             ],
-            default : "applied"
+            default: "applied"
         },
-        appliedAt : {
-            type : Date,
-            default : Date.now
+
+        appliedAt: {
+            type: Date,
+            default: Date.now
         }
     },
     {
-        timestamps : true
+        timestamps: true
     }
 );
 
-// One candidate can apply to a particular job only once
+// A candidate can apply to a particular job only once.
 applicationSchema.index(
-    {job : 1  , candidate : 1 },
-    { unique : true }
+    { job: 1, candidate: 1 },
+    { unique: true }
 );
 
-const Application = mongoose.model("Application" , applicationSchema);
+const Application = mongoose.model(
+    "Application",
+    applicationSchema
+);
 
 module.exports = Application;

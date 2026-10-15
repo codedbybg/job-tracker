@@ -6,16 +6,24 @@ const Job = require("../models/Job");
 // APPLY FOR A JOB
 const applyForJob = async (req, res) => {
     try {
-        // Security: only candidates can apply for jobs.
+        // Only candidates can apply for jobs.
         if (req.user.role !== "candidate") {
             return res.status(403).json({
                 success: false,
-                message: "Only candidates can apply for jobs"
+                message: "Only candidates can apply for jobs",
             });
         }
 
-        const { jobId } = req.params;
-        const { coverLetter = "" } = req.body;
+        // FIX: The frontend sends jobId in req.body.
+        const { jobId, coverLetter = "" } = req.body;
+
+        // Validate job ID.
+        if (!jobId) {
+            return res.status(400).json({
+                success: false,
+                message: "Job ID is required",
+            });
+        }
 
         // Validate cover letter.
         if (
@@ -24,7 +32,8 @@ const applyForJob = async (req, res) => {
         ) {
             return res.status(400).json({
                 success: false,
-                message: "Cover letter must be a string of at most 2000 characters"
+                message:
+                    "Cover letter must be a string of at most 2000 characters",
             });
         }
 
@@ -34,19 +43,19 @@ const applyForJob = async (req, res) => {
         if (!job) {
             return res.status(404).json({
                 success: false,
-                message: "Job not found"
+                message: "Job not found",
             });
         }
 
-        // Check whether the job is open.
+        // Ensure the job is accepting applications.
         if (job.status !== "open") {
             return res.status(409).json({
                 success: false,
-                message: "This job is no longer accepting applications"
+                message: "This job is no longer accepting applications",
             });
         }
 
-        // Validate and check the application deadline.
+        // Validate the application deadline.
         const deadlineTime = new Date(job.deadline).getTime();
 
         if (
@@ -55,46 +64,53 @@ const applyForJob = async (req, res) => {
         ) {
             return res.status(409).json({
                 success: false,
-                message: "Application deadline has passed or is invalid"
+                message: "Application deadline has passed or is invalid",
             });
         }
 
-        // Check whether the candidate has already applied.
+        // Prevent duplicate applications.
         const existingApplication = await Application.findOne({
-            job: jobId,
-            candidate: req.user.id
+            job: job._id,
+            candidate: req.user.id,
         });
 
         if (existingApplication) {
             return res.status(409).json({
                 success: false,
-                message: "You have already applied for this job"
+                message: "You have already applied for this job",
             });
         }
 
-        // Create the application using the authenticated user's ID.
+        // Create the application.
         const application = await Application.create({
-            job: jobId,
+            job: job._id,
             candidate: req.user.id,
-            coverLetter
+            coverLetter,
         });
 
-        // Increase the job's applicant count.
-        await Job.findByIdAndUpdate(jobId, {
-            $inc: { applicantsCount: 1 }
+        // Update the applicant count.
+        await Job.findByIdAndUpdate(job._id, {
+            $inc: { applicantsCount: 1 },
         });
 
         return res.status(201).json({
             success: true,
             message: "Job application submitted successfully",
-            data: application
+            data: application,
         });
     } catch (error) {
-        // Handle duplicate-key errors, including concurrent requests.
         if (error.code === 11000) {
             return res.status(409).json({
                 success: false,
-                message: "You have already applied for this job"
+                message: "You have already applied for this job",
+            });
+        }
+
+        // Invalid MongoDB ObjectId.
+        if (error.name === "CastError") {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid job ID",
             });
         }
 
@@ -102,7 +118,7 @@ const applyForJob = async (req, res) => {
 
         return res.status(500).json({
             success: false,
-            message: "Failed to submit application"
+            message: "Failed to submit application",
         });
     }
 };

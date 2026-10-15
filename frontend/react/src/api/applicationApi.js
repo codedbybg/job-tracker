@@ -1,15 +1,21 @@
 import api from "./axios";
 
+export const applyForJob = async (jobId, coverLetter = "") => {
+    const response = await api.post("/applications", {
+        jobId,
+        coverLetter,
+    });
+
+    return response.data;
+};
+
 export const getMyApplications = async () => {
     const response = await api.get("/applications/my");
     return response.data;
 };
 
 export const withdrawApplication = async (id) => {
-    const response = await api.patch(
-        `/applications/${id}/withdraw`
-    );
-
+    const response = await api.patch(`/applications/${id}/withdraw`);
     return response.data;
 };
 
@@ -21,7 +27,7 @@ export const getApplicantsForJob = async (jobId) => {
 export const updateApplicationStatus = async (applicationId, status) => {
     const response = await api.patch(
         `/applications/${applicationId}/status`,
-    { status }
+        { status }
     );
 
     return response.data;

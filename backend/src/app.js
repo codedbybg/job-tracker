@@ -8,6 +8,7 @@ const userRoutes = require("./routes/user.routes");
 const authRoutes = require("./routes/auth.routes");
 const jobRoutes = require("./routes/job.routes");
 const applicationRoutes = require("./routes/application.routes");
+const adminRoutes = require("./routes/admin.routes");
 
 const {
     notFound,
@@ -58,7 +59,9 @@ app.use("/api/auth" , authRoutes);
 
 app.use("/api/jobs" , jobRoutes);
 
-app.use("/api/applications" , applicationRoutes)
+app.use("/api/applications" , applicationRoutes);
+
+app.use("/api/admin", adminRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

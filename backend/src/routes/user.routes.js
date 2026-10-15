@@ -1,10 +1,11 @@
+
 const express = require("express");
 
 const {
     getUsers,
     getUserById,
     updateUser,
-    deleteUser
+    deleteUser,
 } = require("../controllers/user.controller");
 
 const protect = require("../middleware/auth.middleware");
@@ -13,37 +14,15 @@ const validateObjectId = require("../middleware/validateObjectId");
 
 const router = express.Router();
 
-console.log("User route handler check:", {
-    getUsers: typeof getUsers,
-    getUserById: typeof getUserById,
-    updateUser: typeof updateUser,
-    deleteUser: typeof deleteUser,
-    protect: typeof protect,
-    authorizeRoles: typeof authorizeRoles,
-    validateObjectId: typeof validateObjectId
-});
-
-// All routes below require an administrator
+// Every user-management route is restricted to administrators.
 router.use(protect, authorizeRoles("admin"));
 
 router.get("/", getUsers);
 
-router.get(
-    "/:id",
-    validateObjectId("id"),
-    getUserById
-);
+router.get("/:id", validateObjectId("id"), getUserById);
 
-router.put(
-    "/:id",
-    validateObjectId("id"),
-    updateUser
-);
+router.put("/:id", validateObjectId("id"), updateUser);
 
-router.delete(
-    "/:id",
-    validateObjectId("id"),
-    deleteUser
-);
+router.delete("/:id", validateObjectId("id"), deleteUser);
 
 module.exports = router;

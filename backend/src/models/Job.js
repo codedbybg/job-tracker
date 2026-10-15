@@ -6,13 +6,13 @@ const jobSchema = new mongoose.Schema(
             type : String,
             required : true,
             trim : true,
-            max_length : 100
+            maxlength : 100
         },
         company : {
             type : String,
             required : true,
             trim : true,
-            max_length : 100
+            maxlength : 100
         },
         description : {
             type : String,
