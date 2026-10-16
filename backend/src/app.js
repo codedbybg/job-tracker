@@ -17,8 +17,6 @@ const {
 
 const app = express();
 
-app.use(express.json());
-
 
 // Security headers
 app.use(helmet());
